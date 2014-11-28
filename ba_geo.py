@@ -1,4 +1,10 @@
+import sys
+import getopt
 import re
+import argparse
+
+import geojson
+from geojson import Feature, FeatureCollection, Point
 import json
 from geopy.geocoders import Nominatim
 
@@ -65,14 +71,27 @@ class Bar(object):
         else:
             return ('None', 'None', 'None', 'None')
 
-#with open('ba_sc.json', 'r') as f:
-#    data = json.load(f)
+#if __name__ == __main__:
+       
+parser = argparse.ArgumentParser(description='Accepts json file and outputs geojson')
+parser.add_argument('-i', '--input', help='The name of the input json file')
+parser.add_argument('-o', '--output', default='output.geojson',
+                    help='The name of the output file.')
+args = parser.parse_args()
 
-#raw_bars = data[u'results'][u'collection1']
-#bars = []
+with open(args.input, 'r') as f:
+    data = json.load(f)
 
-#for bar in raw_bars:
-#    bars.append(Bar(name=bar[u'Name'].encode('utf-8'),
-#                    rating=bar[u'Rating'].encode('utf-8'),
-#                   address=bar[u'Address']))
+raw_bars = data[u'results'][u'collection1']
+bars = []
 
+for bar in raw_bars:
+    bars.append(Bar(name=bar[u'Name'].encode('utf-8'),
+                    rating=bar[u'Rating'].encode('utf-8'),
+                   address=bar[u'Address']))
+
+geodata = FeatureCollection([Feature(geometry=Point((x.lon, x.lat)), id=x.name, 
+          properties={'name': x.name, 'rating': x.rating}) for x in bars if x.lon != 'None'])
+
+with open(args.output, 'w') as f:
+    geojson.dump(geodata, f)
