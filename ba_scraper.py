@@ -3,22 +3,82 @@ from bs4 import BeautifulSoup
 import requests
 import argparse
 
+STATES = {
+    'AK': 'Alaska',
+    'AL': 'Alabama',
+    'AR': 'Arkansas',
+    'AS': 'American Samoa',
+    'AZ': 'Arizona',
+    'CA': 'California',
+    'CO': 'Colorado',
+    'CT': 'Connecticut',
+    'DC': 'District of Columbia',
+    'DE': 'Delaware',
+    'FL': 'Florida',
+    'GA': 'Georgia',
+    'GU': 'Guam',
+    'HI': 'Hawaii',
+    'IA': 'Iowa',
+    'ID': 'Idaho',
+    'IL': 'Illinois',
+    'IN': 'Indiana',
+    'KS': 'Kansas',
+    'KY': 'Kentucky',
+    'LA': 'Louisiana',
+    'MA': 'Massachusetts',
+    'MD': 'Maryland',
+    'ME': 'Maine',
+    'MI': 'Michigan',
+    'MN': 'Minnesota',
+    'MO': 'Missouri',
+    'MP': 'Northern Mariana Islands',
+    'MS': 'Mississippi',
+    'MT': 'Montana',
+    'NA': 'National',
+    'NC': 'North Carolina',
+    'ND': 'North Dakota',
+    'NE': 'Nebraska',
+    'NH': 'New Hampshire',
+    'NJ': 'New Jersey',
+    'NM': 'New Mexico',
+    'NV': 'Nevada',
+    'NY': 'New York',
+    'OH': 'Ohio',
+    'OK': 'Oklahoma',
+    'OR': 'Oregon',
+    'PA': 'Pennsylvania',
+    'PR': 'Puerto Rico',
+    'RI': 'Rhode Island',
+    'SC': 'South Carolina',
+    'SD': 'South Dakota',
+    'TN': 'Tennessee',
+    'TX': 'Texas',
+    'UT': 'Utah',
+    'VA': 'Virginia',
+    'VI': 'Virgin Islands',
+    'VT': 'Vermont',
+    'WA': 'Washington',
+    'WI': 'Wisconsin',
+    'WV': 'West Virginia',
+    'WY': 'Wyoming'
+}
+
 
 def cliargs():
-
+    """Returns --city and --state as arguments for BeerAdvocate parser"""
     parser = argparse.ArgumentParser(
         description='Returns Beer Advocate geodata for City, State')
     parser.add_argument(
-        '--state', required=True, help='Two letter state abreviation')
-    parser.add_argument(
         '--city', type=str, nargs='+', required=True, help='City')
+    parser.add_argument(
+        '--state', required=True, help='Two letter state abreviation')
     args = parser.parse_args()
 
     return (args.city, args.state)
 
 
 def get_beer(city, state):
-
+    """Determines maximum # of ratings and returns list of response data"""
     responses = []
     base_url = 'http://www.beeradvocate.com/place/list/?start=%s&c_id=US&s_id=%s&city=%s&sort=name'
 
@@ -40,17 +100,52 @@ def get_beer(city, state):
 
 
 def parse(response_data):
-
-    bars = []
+    """Parses names, streets, zipcodes, categories, ratings from responses"""
     for data in response_data:
         names = [name.getText() for name in
                  data.findAll('td', attrs={'colspan': 2, 'align': 'left'})]
-        bars.extend(names)
+
+        addresses = [address.getText() for address in
+                     data.findAll('td', attrs={'class': 'hr_bottom_dark',
+                                               'align': 'left'})]
+        zipcodes = []
+        streets = []
+        for address in addresses:
+            zipcode_pattern = ''.join(['(?<=', STATES[state], ', )\d{5}'])
+            zipcode = re.search(zipcode_pattern, address).group()
+            if zipcode:
+                zipcodes.append(zipcode)
+            else:
+                zipcodes.append('')
+
+            street_pattern = ''.join(['.*(?=', ' '.join(city), ')'])
+            street = re.search(street_pattern, address).group()
+            if street:
+                streets.append(street)
+            else:
+                streets.append('')
+
+        cat_pattern = '\[\\xa0(.*)\\xa0\]'
+        raw_categories = [re.findall(cat_pattern, category.getText())[0].split() for category in
+                          data.findAll('td', attrs={'class': 'hr_bottom_dark',
+                                                    'align': 'right'})]
+        categories = [[cat.strip(',') for cat in cat_list]
+                      for cat_list in raw_categories]
+
+        ratings = [rating.getText() for rating in
+                   data.findAll('td', attrs={'class': 'hr_bottom_light'})[::4]]
+    bars = [{'name': name,
+             'street': street,
+             'zipcode': zipcode,
+             'categories': cats,
+             'rating': rating}
+            for name, street, zipcode, cats, rating in
+            zip(names, streets, zipcodes, categories, ratings)]
     return bars
 
 if __name__ == '__main__':
 
     city, state = cliargs()
     response = get_beer(city, state)
-    bar_names = parse(response)
-    print(len(bar_names))
+    bars = parse(response)
+    print(len(bars))
