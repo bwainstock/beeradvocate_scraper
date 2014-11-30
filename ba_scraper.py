@@ -87,7 +87,7 @@ def get_beer(city, state):
     responses.append(data)
     num_results = data.findAll('td', attrs={'bgcolor': '#000000'})
     num_results = num_results[0].text
-    num_results = re.findall('(\d+)(?!.*\d)', num_results)
+    num_results = re.findall(r'(\d+)(?!.*\d)', num_results)
     num_results = int(num_results[0])
 
     url_list = [base_url % (start, state, '+'.join(city))
@@ -101,6 +101,8 @@ def get_beer(city, state):
 
 def parse(response_data):
     """Parses names, streets, zipcodes, categories, ratings from responses"""
+
+    bars = []
     for data in response_data:
         names = [name.getText() for name in
                  data.findAll('td', attrs={'colspan': 2, 'align': 'left'})]
@@ -111,21 +113,21 @@ def parse(response_data):
         zipcodes = []
         streets = []
         for address in addresses:
-            zipcode_pattern = ''.join(['(?<=', STATES[state], ', )\d{5}'])
-            zipcode = re.search(zipcode_pattern, address).group()
+            zipcode_pattern = ''.join(['(?<=', STATES[state], r', )\d{5}'])
+            zipcode = re.search(zipcode_pattern, address)
             if zipcode:
-                zipcodes.append(zipcode)
+                zipcodes.append(zipcode.group())
             else:
                 zipcodes.append('')
 
             street_pattern = ''.join(['.*(?=', ' '.join(city), ')'])
-            street = re.search(street_pattern, address).group()
+            street = re.search(street_pattern, address)
             if street:
-                streets.append(street)
+                streets.append(street.group())
             else:
                 streets.append('')
 
-        cat_pattern = '\[\\xa0(.*)\\xa0\]'
+        cat_pattern = r'\[\\xa0(.*)\\xa0\]'
         raw_categories = [re.findall(cat_pattern, category.getText())[0].split() for category in
                           data.findAll('td', attrs={'class': 'hr_bottom_dark',
                                                     'align': 'right'})]
@@ -134,13 +136,13 @@ def parse(response_data):
 
         ratings = [rating.getText() for rating in
                    data.findAll('td', attrs={'class': 'hr_bottom_light'})[::4]]
-    bars = [{'name': name,
-             'street': street,
-             'zipcode': zipcode,
-             'categories': cats,
-             'rating': rating}
-            for name, street, zipcode, cats, rating in
-            zip(names, streets, zipcodes, categories, ratings)]
+        bars.extend([{'name': name,
+                      'street': street,
+                      'zipcode': zipcode,
+                      'categories': cats,
+                      'rating': rating}
+                    for name, street, zipcode, cats, rating in
+                        zip(names, streets, zipcodes, categories, ratings)])
     return bars
 
 if __name__ == '__main__':
