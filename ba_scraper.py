@@ -17,24 +17,24 @@ def cliargs():
     return (args.city, args.state)
 
 
-def getBeer(city, state):
+def get_beer(city, state):
 
     responses = []
     base_url = 'http://www.beeradvocate.com/place/list/?start=%s&c_id=US&s_id=%s&city=%s&sort=name'
 
-    r = requests.get(base_url % (0, state, '+'.join(city)))
-    data = BeautifulSoup(r.content)
+    response = requests.get(base_url % (0, state, '+'.join(city)))
+    data = BeautifulSoup(response.content)
     responses.append(data)
-    numResults = data.findAll('td', attrs={'bgcolor': '#000000'})
-    numResults = numResults[0].text
-    numResults = re.findall('(\d+)(?!.*\d)', numResults)
-    numResults = int(numResults[0][:-1])
+    num_results = data.findAll('td', attrs={'bgcolor': '#000000'})
+    num_results = num_results[0].text
+    num_results = re.findall('(\d+)(?!.*\d)', num_results)
+    num_results = int(num_results[0])
 
     url_list = [base_url % (start, state, '+'.join(city))
-                for start in range(20, 20 * (numResults / 20) + 1, 20)]
+                for start in range(20, 20 * (num_results // 20) + 1, 20)]
     for url in url_list:
-        r = requests.get(url)
-        data = BeautifulSoup(r.content)
+        response = requests.get(url)
+        data = BeautifulSoup(response.content)
         responses.append(data)
     return responses
 
@@ -51,6 +51,6 @@ def parse(response_data):
 if __name__ == '__main__':
 
     city, state = cliargs()
-    r = getBeer(city, state)
-    bar_names = parse(r)
+    response = get_beer(city, state)
+    bar_names = parse(response)
     print(bar_names, len(bar_names))
