@@ -53,4 +53,4 @@ if __name__ == '__main__':
     city, state = cliargs()
     response = get_beer(city, state)
     bar_names = parse(response)
-    print(bar_names, len(bar_names))
+    print(len(bar_names))
