@@ -1,12 +1,12 @@
-import re
-from bs4 import BeautifulSoup
-import requests
 import argparse
-import geojson
+import re
 from time import sleep
+
+from bs4 import BeautifulSoup
 from geopy.geocoders import GoogleV3
 from geojson import Point, Feature, FeatureCollection
-
+import geojson
+import requests
 
 STATES = {
     'AK': 'Alaska',
