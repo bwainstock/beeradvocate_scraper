@@ -1,1 +1,40 @@
-BA Test
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BA Scraper Test</title>
+
+  <link href='https://api.tiles.mapbox.com/mapbox.js/v2.1.4/mapbox.css' rel='stylesheet' />
+  <style type="text/css">
+    body {
+      padding: 0;
+      margin: 0;
+    }
+
+    html, body, #map {
+      height: 100%;
+    }
+
+  </style>
+  <script src='https://api.tiles.mapbox.com/mapbox.js/v2.1.4/mapbox.js'></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+</head>
+<body>
+  <div id='map'></div>
+
+  <script>
+
+    L.mapbox.accessToken = 'pk.eyJ1IjoiYndhaW5zdG9jayIsImEiOiJBMlNIQk9rIn0.6itKJwxaTteIMCyVjoWwGg';
+
+    $.getJSON('./sanjose.json', function(data) {
+        var geojson = L.geoJson(data, {
+          onEachFeature: function (feature, layer) {
+            layer.bindPopup(feature.properties.name);
+          }
+        });
+
+        var map = L.mapbox.map('map', 'examples.map-i86nkdio').fitBounds(geojson.getBounds());
+        geojson.addTo(map);
+    });
+  </script>
+</body>
+</html>
