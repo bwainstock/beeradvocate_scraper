@@ -2,6 +2,8 @@ import re
 from bs4 import BeautifulSoup
 import requests
 import argparse
+import geojson
+from time import sleep
 
 STATES = {
     'AK': 'Alaska',
@@ -113,21 +115,21 @@ def parse(response_data):
         zipcodes = []
         streets = []
         for address in addresses:
-            zipcode_pattern = ''.join(['(?<=', STATES[state], r', )\d{5}'])
+            zipcode_pattern = ''.join(['(?<=', STATES[STATE], r', )\d{5}'])
             zipcode = re.search(zipcode_pattern, address)
             if zipcode:
                 zipcodes.append(zipcode.group())
             else:
                 zipcodes.append('')
 
-            street_pattern = ''.join(['.*(?=', ' '.join(city), ')'])
+            street_pattern = ''.join(['.*(?=', ' '.join(CITY), ')'])
             street = re.search(street_pattern, address)
             if street:
                 streets.append(street.group())
             else:
                 streets.append('')
 
-        cat_pattern = r'\[\\xa0(.*)\\xa0\]'
+        cat_pattern = '\[\\xa0(.*)\\xa0\]'
         raw_categories = [re.findall(cat_pattern, category.getText())[0].split() for category in
                           data.findAll('td', attrs={'class': 'hr_bottom_dark',
                                                     'align': 'right'})]
@@ -145,9 +147,31 @@ def parse(response_data):
                         zip(names, streets, zipcodes, categories, ratings)])
     return bars
 
+def geocoder(bars):
+    from geopy.geocoders import GoogleV3
+    from geojson import Point, Feature, FeatureCollection
+    geolocator = GoogleV3()
+
+    for index, bar in enumerate(bars):
+        print(bar['name'])
+        if bar['zipcode']:
+            location = geolocator.geocode(' '.join([bar['street'], bar['zipcode']]))
+            bars[index]['index'] = index
+            bars[index]['lat'] = location.latitude
+            bars[index]['lon'] = location.longitude
+            bars[index]['geom'] = Point((location.longitude, location.latitude))
+            sleep(.2)
+
+    return FeatureCollection([Feature(geometry=bar['geom'], id=bar['index'],
+                             properties={'name': bar['name'],
+                                         'rating': bar['rating'],
+                                         'categories': bar['categories']})
+                             for bar in bars if bar['zipcode']])
+
 if __name__ == '__main__':
 
-    city, state = cliargs()
-    response = get_beer(city, state)
-    bars = parse(response)
-    print(len(bars))
+    CITY, STATE = cliargs()
+    RESPONSE = get_beer(CITY, STATE)
+    BARS = parse(RESPONSE)
+    with open(''.join([''.join(CITY), '.json']).lower(), 'w') as FILE:
+        geojson.dump(geocoder(BARS), FILE)

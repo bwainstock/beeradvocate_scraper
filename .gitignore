@@ -1,2 +1,6 @@
 __pychache__/
+data/
 VIRTUAL/
+web/
+*.pyc
+*.py.swp
