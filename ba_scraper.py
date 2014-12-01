@@ -4,6 +4,9 @@ import requests
 import argparse
 import geojson
 from time import sleep
+from geopy.geocoders import GoogleV3
+from geojson import Point, Feature, FeatureCollection
+
 
 STATES = {
     'AK': 'Alaska',
@@ -149,8 +152,6 @@ def parse(response_data):
 
 def geocoder(bars):
     """Geocodes bar information using GoogleV3 API and returns geoJSON FeatureCollection"""
-    from geopy.geocoders import GoogleV3
-    from geojson import Point, Feature, FeatureCollection
     geolocator = GoogleV3()
 
     for index, bar in enumerate(bars):
