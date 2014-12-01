@@ -148,12 +148,13 @@ def parse(response_data):
     return bars
 
 def geocoder(bars):
+    """Geocodes bar information using GoogleV3 API and returns geoJSON FeatureCollection"""
     from geopy.geocoders import GoogleV3
     from geojson import Point, Feature, FeatureCollection
     geolocator = GoogleV3()
 
     for index, bar in enumerate(bars):
-        print(bar['name'])
+        
         if bar['zipcode']:
             location = geolocator.geocode(' '.join([bar['street'], bar['zipcode']]))
             bars[index]['index'] = index
