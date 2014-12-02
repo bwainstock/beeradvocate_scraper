@@ -106,7 +106,6 @@ def get_beer(city, state):
 
 def parse(response_data):
     """Parses names, streets, zipcodes, categories, ratings from responses"""
-
     bars = []
     for data in response_data:
         names = [name.getText() for name in
@@ -139,7 +138,7 @@ def parse(response_data):
         categories = [[cat.strip(',') for cat in cat_list]
                       for cat_list in raw_categories]
 
-        ratings = [rating.getText() for rating in
+        ratings = [float(rating.getText()) if rating.getText() != '-' else 'null'  for rating in
                    data.findAll('td', attrs={'class': 'hr_bottom_light'})[::4]]
         bars.extend([{'name': name,
                       'street': street,
@@ -170,10 +169,16 @@ def geocoder(bars):
                                          'categories': bar['categories']})
                              for bar in bars if bar['zipcode']])
 
+#def toCartoDB(GEOJSON):
+#    """Uploads file to CartoDB"""
+#
+#    r = requests.post(url, files={'file': open('FILENAME', 'rb')})
+#
+
 if __name__ == '__main__':
 
     CITY, STATE = cliargs()
     RESPONSE = get_beer(CITY, STATE)
-    BARS = parse(RESPONSE)
-    with open(''.join([''.join(CITY), '.json']).lower(), 'w') as FILE:
-        geojson.dump(geocoder(BARS), FILE)
+    JSON = parse(RESPONSE)
+    with open(''.join([''.join(CITY), '_', STATE, '.json']).lower(), 'w') as FILE:
+        geojson.dump(geocoder(JSON), FILE)
