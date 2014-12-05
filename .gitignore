@@ -1,6 +1,7 @@
 __pychache__/
 data/
 VIRTUAL/
+env/
 web/
 *.pyc
 *.swp
