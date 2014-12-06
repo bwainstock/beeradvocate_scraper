@@ -210,21 +210,28 @@ def geocoder(bars):
             bar.geocode(location.longitude, location.latitude)
             sleep(.2)
 
-    return FeatureCollection([bar.feature for bar in bars if bar.zipcode])
+    return [bar.feature for bar in bars if bar.zipcode]
 
 def write_cities(cities, state):
     """Creates directory structure and writes geojson data to file '/state/city_state.json'"""
+    features = []
+    
     for city in cities:
 
         response = get_beer(city, state)
-        json = parse(response, city)
+        bars = parse(response, city)
 
         if not os.path.exists(state):
             os.makedirs(state)
+            
+        features.extend(geocoder(bars))
 
-        filename = ''.join([''.join(city), '_', state, '.json']).lower()
-        with open('/'.join([state, filename]), 'w') as geofile:
-            geojson.dump(geocoder(json), geofile)
+    featurecollection = FeatureCollection(features)
+    with open('.'.join([state, 'json']), 'a') as geofile:
+        geojson.dump(featurecollection, geofile)
+        # filename = ''.join([''.join(city), '_', state, '.json']).lower()
+        # with open('/'.join([state, filename]), 'w') as geofile:
+        #     geojson.dump(geocoder(json), geofile)
 
 #def toCartoDB(GEOJSON):
 #    """Uploads file to CartoDB"""
@@ -232,10 +239,6 @@ def write_cities(cities, state):
 #    r = requests.post(url, files={'file': open('FILENAME', 'rb')})
 #
 if __name__ == '__main__':
-
+    # print(cliargs())
     CITIES, STATE = cliargs()
     write_cities(CITIES, STATE)
-    # RESPONSE = get_beer(CITY, STATE)
-    # JSON = parse(RESPONSE)
-    # with open(''.join([''.join(CITY), '_', STATE, '.json']).lower(), 'w') as FILE:
-    #     geojson.dump(geocoder(JSON), FILE)
