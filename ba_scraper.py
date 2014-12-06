@@ -1,4 +1,5 @@
 import argparse
+import os
 import re
 from time import sleep
 
@@ -79,8 +80,10 @@ class Bar(object):
         self.lon = 0
         self.geom = None
         self.feature = None
+        
     def __repr__(self):
       return "Bar: %s" % self.name
+      
     def geocode(self, lon, lat):
         self.lat = lat
         self.lon = lon
@@ -107,14 +110,14 @@ def cliargs():
     if city:
         return city, state
 
-    return (get_cities(state), state)
+    return get_cities(state), state
 
 
 def get_beer(city, state):
     """Determines maximum # of ratings and returns list of response data"""
     responses = []
     base_url = 'http://www.beeradvocate.com/place/list/?start=%s&c_id=US&s_id=%s&city=%s&sort=name'
-
+    print base_url % (0, state, '+'.join(city))
     response = requests.get(base_url % (0, state, '+'.join(city)))
     data = BeautifulSoup(response.content)
     responses.append(data)
@@ -132,19 +135,23 @@ def get_beer(city, state):
     return responses
 
 def get_cities(state):
-    """Parses cities of given STATES from BeerAdvocate url"""
-    cities = []
+    """Parses two columns of cities for given STATES from BeerAdvocate url"""
+    print "Cities gotten!"
+    
     url = 'http://www.beeradvocate.com/place/directory/9/US/AL/'
     r = requests.get(url)
-    data = BeautifulSoup(data)
+    data = BeautifulSoup(r.content)
 
     raw_cities = data.findAll('td',
-                              attrs={'align': 'left', 'valign': 'top', 'width': '50%'})
-    cities = {'AL', [city.text for city in raw_cities[2].findAll('li')]}
+                              attrs={'align': 'left', 'valign': 'top'})
+    cities = [city.text.split() for city in raw_cities[5].findAll('li')]
+    
+    cities.extend([city.text.split() for city in raw_cities[6].findAll('li')])
+    
+    return cities
 
-def parse(response_data):
+def parse(response_data, city):
     """Parses names, streets, zipcodes, categories, ratings from responses"""
-    # bars = []
     for data in response_data:
         names = [name.getText() for name in
                  data.findAll('td', attrs={'colspan': 2, 'align': 'left'})]
@@ -162,7 +169,7 @@ def parse(response_data):
             else:
                 zipcodes.append('')
 
-            street_pattern = ''.join(['.*(?=', ' '.join(CITY), ')'])
+            street_pattern = ''.join(['.*(?=', ' '.join(city), ')'])
             street = re.search(street_pattern, address)
             if street:
                 streets.append(street.group())
@@ -182,15 +189,6 @@ def parse(response_data):
         return [Bar(name, street, zipcode, cats, rating)
                 for name, street, zipcode, cats, rating in
                 zip(names, streets, zipcodes, categories, ratings)]
-        
-        # bars.extend([{'name': name,
-        #               'street': street,
-        #               'zipcode': zipcode,
-        #               'categories': cats,
-        #               'rating': rating}
-        #             for name, street, zipcode, cats, rating in
-        #                 zip(names, streets, zipcodes, categories, ratings)])
-    # return bars
 
 def geocoder(bars):
     """Geocodes bar information using GoogleV3 API and returns geoJSON FeatureCollection"""
@@ -199,11 +197,8 @@ def geocoder(bars):
     for bar in bars:
         
         if bar.zipcode:
+            print bar.name
             location = geolocator.geocode(' '.join([bar.street, bar.zipcode]))
-            # bars[index]['index'] = index
-            # bars[index]['lat'] = location.latitude
-            # bars[index]['lon'] = location.longitude
-            # bars[index]['geom'] = Point((location.longitude, location.latitude)
             bar.geocode(location.longitude, location.latitude)
             sleep(.2)
 
@@ -214,14 +209,25 @@ def geocoder(bars):
 #
 #    r = requests.post(url, files={'file': open('FILENAME', 'rb')})
 #
-def write_geojson(geojson_data):
+def write_cities(cities, state):
     """Creates directory structure and writes geojson data to file '/state/city_state.json'"""
-
-    
+    for city in cities:
+      
+      response = get_beer(city, state)
+      json = parse(response, city)
+      
+      if not os.path.exists(state):
+        os.makedirs(state)
+      
+      filename = ''.join([''.join(city), '_', state, '.json']).lower()
+      with open('/'.join([state, filename]), 'w') as file:
+        geojson.dump(geocoder(json), file)
+        
 if __name__ == '__main__':
-
-    CITY, STATE = cliargs()
-    RESPONSE = get_beer(CITY, STATE)
-    JSON = parse(RESPONSE)
-    with open(''.join([''.join(CITY), '_', STATE, '.json']).lower(), 'w') as FILE:
-        geojson.dump(geocoder(JSON), FILE)
+  
+    CITIES, STATE = cliargs()
+    write_cities(CITIES, STATE)
+    # RESPONSE = get_beer(CITY, STATE)
+    # JSON = parse(RESPONSE)
+    # with open(''.join([''.join(CITY), '_', STATE, '.json']).lower(), 'w') as FILE:
+    #     geojson.dump(geocoder(JSON), FILE)
