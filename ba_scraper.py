@@ -108,7 +108,7 @@ def cliargs():
     state = args.state
 
     if city:
-        return city, state
+        return [city], state
 
     return get_cities(state), state
 
@@ -204,11 +204,6 @@ def geocoder(bars):
 
     return FeatureCollection([bar.feature for bar in bars if bar.zipcode])
 
-#def toCartoDB(GEOJSON):
-#    """Uploads file to CartoDB"""
-#
-#    r = requests.post(url, files={'file': open('FILENAME', 'rb')})
-#
 def write_cities(cities, state):
     """Creates directory structure and writes geojson data to file '/state/city_state.json'"""
     for city in cities:
@@ -222,7 +217,12 @@ def write_cities(cities, state):
       filename = ''.join([''.join(city), '_', state, '.json']).lower()
       with open('/'.join([state, filename]), 'w') as file:
         geojson.dump(geocoder(json), file)
-        
+
+#def toCartoDB(GEOJSON):
+#    """Uploads file to CartoDB"""
+#
+#    r = requests.post(url, files={'file': open('FILENAME', 'rb')})
+#
 if __name__ == '__main__':
   
     CITIES, STATE = cliargs()
