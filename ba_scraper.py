@@ -156,12 +156,15 @@ def geocoder(bars):
     for index, bar in enumerate(bars):
         
         if bar['zipcode']:
+            print "Geolocating ", bar['name']
             location = geolocator.geocode(' '.join([bar['street'], bar['zipcode']]))
             bars[index]['index'] = index
             bars[index]['lat'] = location.latitude
             bars[index]['lon'] = location.longitude
             bars[index]['geom'] = Point((location.longitude, location.latitude))
             sleep(.2)
+        else:
+            print "Could not locate ", bar['name']
 
     return FeatureCollection([Feature(geometry=bar['geom'], id=bar['index'],
                              properties={'name': bar['name'],
