@@ -1,3 +1,5 @@
+"""Scrapes beeradvocate.com for geographic information about bars"""
+
 import argparse
 import os
 import re
@@ -70,6 +72,11 @@ STATES = {
 }
 
 class Bar(object):
+    """Defines a bar with name and geographical information
+
+    geocode(lon, lat): formats a geojson geometry and Feature
+    """
+
     def __init__(self, name, street, zipcode, categories, rating):
         self.name = name
         self.street = street
@@ -80,11 +87,12 @@ class Bar(object):
         self.lon = 0
         self.geom = None
         self.feature = None
-        
+
     def __repr__(self):
-      return "Bar: %s" % self.name
-      
+        return "Bar: %s" % self.name
+
     def geocode(self, lon, lat):
+        """Formats geojson data, including geom and Feature"""
         self.lat = lat
         self.lon = lon
         self.geom = Point((self.lon, self.lat))
@@ -92,7 +100,7 @@ class Bar(object):
                                properties={'name': self.name,
                                            'rating': self.rating,
                                            'categories': self.categories})
-    
+
 
 def cliargs():
     """Returns --city and --state as arguments for BeerAdvocate parser"""
@@ -103,7 +111,7 @@ def cliargs():
     parser.add_argument(
         '--state', required=True, help='Two letter state abreviation')
     args = parser.parse_args()
-    
+
     city = args.city
     state = args.state
 
@@ -137,17 +145,17 @@ def get_beer(city, state):
 def get_cities(state):
     """Parses two columns of cities for given STATES from BeerAdvocate url"""
     print "Cities gotten!"
-    
-    url = 'http://www.beeradvocate.com/place/directory/9/US/AL/'
-    r = requests.get(url)
-    data = BeautifulSoup(r.content)
+
+    url = 'http://www.beeradvocate.com/place/directory/9/US/%s/' % state
+    response = requests.get(url)
+    data = BeautifulSoup(response.content)
 
     raw_cities = data.findAll('td',
                               attrs={'align': 'left', 'valign': 'top'})
     cities = [city.text.split() for city in raw_cities[5].findAll('li')]
-    
+
     cities.extend([city.text.split() for city in raw_cities[6].findAll('li')])
-    
+
     return cities
 
 def parse(response_data, city):
@@ -185,7 +193,7 @@ def parse(response_data, city):
 
         ratings = [float(rating.getText()) if rating.getText() != '-' else 'null'  for rating in
                    data.findAll('td', attrs={'class': 'hr_bottom_light'})[::4]]
-                   
+
         return [Bar(name, street, zipcode, cats, rating)
                 for name, street, zipcode, cats, rating in
                 zip(names, streets, zipcodes, categories, ratings)]
@@ -195,7 +203,7 @@ def geocoder(bars):
     geolocator = GoogleV3()
 
     for bar in bars:
-        
+
         if bar.zipcode:
             print bar.name
             location = geolocator.geocode(' '.join([bar.street, bar.zipcode]))
@@ -207,16 +215,16 @@ def geocoder(bars):
 def write_cities(cities, state):
     """Creates directory structure and writes geojson data to file '/state/city_state.json'"""
     for city in cities:
-      
-      response = get_beer(city, state)
-      json = parse(response, city)
-      
-      if not os.path.exists(state):
-        os.makedirs(state)
-      
-      filename = ''.join([''.join(city), '_', state, '.json']).lower()
-      with open('/'.join([state, filename]), 'w') as file:
-        geojson.dump(geocoder(json), file)
+
+        response = get_beer(city, state)
+        json = parse(response, city)
+
+        if not os.path.exists(state):
+            os.makedirs(state)
+
+        filename = ''.join([''.join(city), '_', state, '.json']).lower()
+        with open('/'.join([state, filename]), 'w') as geofile:
+            geojson.dump(geocoder(json), geofile)
 
 #def toCartoDB(GEOJSON):
 #    """Uploads file to CartoDB"""
@@ -224,7 +232,7 @@ def write_cities(cities, state):
 #    r = requests.post(url, files={'file': open('FILENAME', 'rb')})
 #
 if __name__ == '__main__':
-  
+
     CITIES, STATE = cliargs()
     write_cities(CITIES, STATE)
     # RESPONSE = get_beer(CITY, STATE)
