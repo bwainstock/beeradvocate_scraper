@@ -127,19 +127,21 @@ def get_beer(city, state):
     base_url = 'http://www.beeradvocate.com/place/list/?start=%s&c_id=US&s_id=%s&city=%s&sort=name'
     print base_url % (0, state, '+'.join(city))
     response = requests.get(base_url % (0, state, '+'.join(city)))
-    data = BeautifulSoup(response.content)
-    responses.append(data)
-    num_results = data.findAll('td', attrs={'bgcolor': '#000000'})
-    num_results = num_results[0].text
-    num_results = re.findall(r'(\d+)(?!.*\d)', num_results)
-    num_results = int(num_results[0])
-
-    url_list = [base_url % (start, state, '+'.join(city))
-                for start in range(20, 20 * (num_results // 20) + 1, 20)]
-    for url in url_list:
-        response = requests.get(url)
+    if 'fail' not in response.url:
         data = BeautifulSoup(response.content)
         responses.append(data)
+        num_results = data.findAll('td', attrs={'bgcolor': '#000000'})
+        num_results = num_results[0].text
+        num_results = re.findall(r'(\d+)(?!.*\d)', num_results)
+        num_results = int(num_results[0])
+
+        url_list = [base_url % (start, state, '+'.join(city))
+                    for start in range(20, 20 * (num_results // 20) + 1, 20)]
+        for url in url_list:
+            response = requests.get(url)
+            data = BeautifulSoup(response.content)
+            responses.append(data)
+    
     return responses
 
 def get_cities(state):
@@ -149,12 +151,18 @@ def get_cities(state):
     url = 'http://www.beeradvocate.com/place/directory/9/US/%s/' % state
     response = requests.get(url)
     data = BeautifulSoup(response.content)
+    
+    tables = data.findAll('table', 
+                          attrs={'width': '100%', 'border': '0', 'cellspacing': '0', 'cellpadding': '2'})
+    for table in tables:
+        if 'Cities & Towns' in table.findChild().text:
+            cities = [city.text.split() for city in table.findAll('li')]
 
-    raw_cities = data.findAll('td',
-                              attrs={'align': 'left', 'valign': 'top'})
-    cities = [city.text.split() for city in raw_cities[5].findAll('li')]
-
-    cities.extend([city.text.split() for city in raw_cities[6].findAll('li')])
+#    raw_cities = data.findAll('td',
+#                              attrs={'align': 'left', 'valign': 'top'})
+#    cities = [city.text.split() for city in raw_cities[5].findAll('li')]
+#
+#    cities.extend([city.text.split() for city in raw_cities[6].findAll('li')])
 
     return cities
 
@@ -206,8 +214,12 @@ def geocoder(bars):
 
         if bar.zipcode:
             print bar.name
-            location = geolocator.geocode(' '.join([bar.street, bar.zipcode]))
-            bar.geocode(location.longitude, location.latitude)
+            try:
+                location = geolocator.geocode(' '.join([bar.street, bar.zipcode]))
+            except GeocoderUnavailable, error:
+                print error
+            else:
+                bar.geocode(location.longitude, location.latitude)
             sleep(.2)
 
     return [bar.feature for bar in bars if bar.zipcode]
@@ -219,12 +231,13 @@ def write_cities(cities, state):
     for city in cities:
 
         response = get_beer(city, state)
-        bars = parse(response, city)
+        if response:
+            bars = parse(response, city)
+            features.extend(geocoder(bars))
 
-        if not os.path.exists(state):
-            os.makedirs(state)
+#        if not os.path.exists(state):
+#            os.makedirs(state)
             
-        features.extend(geocoder(bars))
 
     featurecollection = FeatureCollection(features)
     with open('.'.join([state, 'json']), 'a') as geofile:
@@ -239,6 +252,6 @@ def write_cities(cities, state):
 #    r = requests.post(url, files={'file': open('FILENAME', 'rb')})
 #
 if __name__ == '__main__':
-    # print(cliargs())
+    #print(cliargs())
     CITIES, STATE = cliargs()
     write_cities(CITIES, STATE)
