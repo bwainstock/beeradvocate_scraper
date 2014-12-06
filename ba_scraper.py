@@ -1,11 +1,12 @@
 """Scrapes beeradvocate.com for geographic information about bars"""
 
 import argparse
-import os
+#import os
 import re
 from time import sleep
 
 from bs4 import BeautifulSoup
+import geopy
 from geopy.geocoders import GoogleV3
 from geojson import Point, Feature, FeatureCollection
 import geojson
@@ -141,7 +142,7 @@ def get_beer(city, state):
             response = requests.get(url)
             data = BeautifulSoup(response.content)
             responses.append(data)
-    
+
     return responses
 
 def get_cities(state):
@@ -151,18 +152,15 @@ def get_cities(state):
     url = 'http://www.beeradvocate.com/place/directory/9/US/%s/' % state
     response = requests.get(url)
     data = BeautifulSoup(response.content)
-    
-    tables = data.findAll('table', 
-                          attrs={'width': '100%', 'border': '0', 'cellspacing': '0', 'cellpadding': '2'})
+
+    tables = data.findAll('table',
+                          attrs={'width': '100%',
+                                 'border': '0',
+                                 'cellspacing': '0',
+                                 'cellpadding': '2'})
     for table in tables:
         if 'Cities & Towns' in table.findChild().text:
             cities = [city.text.split() for city in table.findAll('li')]
-
-#    raw_cities = data.findAll('td',
-#                              attrs={'align': 'left', 'valign': 'top'})
-#    cities = [city.text.split() for city in raw_cities[5].findAll('li')]
-#
-#    cities.extend([city.text.split() for city in raw_cities[6].findAll('li')])
 
     return cities
 
@@ -216,7 +214,7 @@ def geocoder(bars):
             print bar.name
             try:
                 location = geolocator.geocode(' '.join([bar.street, bar.zipcode]))
-            except GeocoderUnavailable, error:
+            except geopy.exc.GeocoderUnavailable, error:
                 print error
             else:
                 bar.geocode(location.longitude, location.latitude)
@@ -227,7 +225,7 @@ def geocoder(bars):
 def write_cities(cities, state):
     """Creates directory structure and writes geojson data to file '/state/city_state.json'"""
     features = []
-    
+
     for city in cities:
 
         response = get_beer(city, state)
@@ -237,7 +235,7 @@ def write_cities(cities, state):
 
 #        if not os.path.exists(state):
 #            os.makedirs(state)
-            
+
 
     featurecollection = FeatureCollection(features)
     with open('.'.join([state, 'json']), 'a') as geofile:
@@ -251,6 +249,7 @@ def write_cities(cities, state):
 #
 #    r = requests.post(url, files={'file': open('FILENAME', 'rb')})
 #
+
 if __name__ == '__main__':
     #print(cliargs())
     CITIES, STATE = cliargs()
