@@ -68,18 +68,46 @@ STATES = {
     'WY': 'Wyoming'
 }
 
+class Bar(object):
+    def __init__(self, name, street, zipcode, categories, rating):
+        self.name = name
+        self.street = street
+        self.zipcode = zipcode
+        self.categories = categories
+        self.rating = rating
+        self.lat = 0
+        self.lon = 0
+        self.geom = None
+        self.feature = None
+    def __repr__(self):
+      return "Bar: %s" % self.name
+    def geocode(self, lon, lat):
+        self.lat = lat
+        self.lon = lon
+        self.geom = Point((self.lon, self.lat))
+        self.feature = Feature(geometry=self.geom,
+                               properties={'name': self.name,
+                                           'rating': self.rating,
+                                           'categories': self.categories})
+    
 
 def cliargs():
     """Returns --city and --state as arguments for BeerAdvocate parser"""
     parser = argparse.ArgumentParser(
         description='Returns Beer Advocate geodata for City, State')
     parser.add_argument(
-        '--city', type=str, nargs='+', required=True, help='City')
+        '--city', type=str, nargs='+', help='City')
     parser.add_argument(
         '--state', required=True, help='Two letter state abreviation')
     args = parser.parse_args()
+    
+    city = args.city
+    state = args.state
 
-    return (args.city, args.state)
+    if city:
+        return city, state
+
+    return (get_cities(state), state)
 
 
 def get_beer(city, state):
@@ -103,10 +131,20 @@ def get_beer(city, state):
         responses.append(data)
     return responses
 
+def get_cities(state):
+    """Parses cities of given STATES from BeerAdvocate url"""
+    cities = []
+    url = 'http://www.beeradvocate.com/place/directory/9/US/AL/'
+    r = requests.get(url)
+    data = BeautifulSoup(data)
+
+    raw_cities = data.findAll('td',
+                              attrs={'align': 'left', 'valign': 'top', 'width': '50%'})
+    cities = {'AL', [city.text for city in raw_cities[2].findAll('li')]}
 
 def parse(response_data):
     """Parses names, streets, zipcodes, categories, ratings from responses"""
-    bars = []
+    # bars = []
     for data in response_data:
         names = [name.getText() for name in
                  data.findAll('td', attrs={'colspan': 2, 'align': 'left'})]
@@ -140,41 +178,46 @@ def parse(response_data):
 
         ratings = [float(rating.getText()) if rating.getText() != '-' else 'null'  for rating in
                    data.findAll('td', attrs={'class': 'hr_bottom_light'})[::4]]
-        bars.extend([{'name': name,
-                      'street': street,
-                      'zipcode': zipcode,
-                      'categories': cats,
-                      'rating': rating}
-                    for name, street, zipcode, cats, rating in
-                        zip(names, streets, zipcodes, categories, ratings)])
-    return bars
+                   
+        return [Bar(name, street, zipcode, cats, rating)
+                for name, street, zipcode, cats, rating in
+                zip(names, streets, zipcodes, categories, ratings)]
+        
+        # bars.extend([{'name': name,
+        #               'street': street,
+        #               'zipcode': zipcode,
+        #               'categories': cats,
+        #               'rating': rating}
+        #             for name, street, zipcode, cats, rating in
+        #                 zip(names, streets, zipcodes, categories, ratings)])
+    # return bars
 
 def geocoder(bars):
     """Geocodes bar information using GoogleV3 API and returns geoJSON FeatureCollection"""
     geolocator = GoogleV3()
 
-    for index, bar in enumerate(bars):
+    for bar in bars:
         
-        if bar['zipcode']:
-            location = geolocator.geocode(' '.join([bar['street'], bar['zipcode']]))
-            bars[index]['index'] = index
-            bars[index]['lat'] = location.latitude
-            bars[index]['lon'] = location.longitude
-            bars[index]['geom'] = Point((location.longitude, location.latitude))
+        if bar.zipcode:
+            location = geolocator.geocode(' '.join([bar.street, bar.zipcode]))
+            # bars[index]['index'] = index
+            # bars[index]['lat'] = location.latitude
+            # bars[index]['lon'] = location.longitude
+            # bars[index]['geom'] = Point((location.longitude, location.latitude)
+            bar.geocode(location.longitude, location.latitude)
             sleep(.2)
 
-    return FeatureCollection([Feature(geometry=bar['geom'], id=bar['index'],
-                             properties={'name': bar['name'],
-                                         'rating': bar['rating'],
-                                         'categories': bar['categories']})
-                             for bar in bars if bar['zipcode']])
+    return FeatureCollection([bar.feature for bar in bars if bar.zipcode])
 
 #def toCartoDB(GEOJSON):
 #    """Uploads file to CartoDB"""
 #
 #    r = requests.post(url, files={'file': open('FILENAME', 'rb')})
 #
+def write_geojson(geojson_data):
+    """Creates directory structure and writes geojson data to file '/state/city_state.json'"""
 
+    
 if __name__ == '__main__':
 
     CITY, STATE = cliargs()
