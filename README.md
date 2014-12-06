@@ -4,6 +4,5 @@ Parses data from beeradvocate.com.
 
 TODO:
 =====
-
-Parse cities based on section header
--Find "Cities and Towns" in findAll, then parse
+Figure out output file/directory structure
+Parse all of USA/World
