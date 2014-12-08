@@ -254,7 +254,7 @@ if __name__ == '__main__':
         CITY = [args.city]
     else:
         CITY = get_cities(STATE)
-    carto_user, carto_key = args.cartodb
+    #carto_user, carto_key = args.cartodb
 
     OUTPUT_FILE = ba_to_json(CITY, STATE)
 
