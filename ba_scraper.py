@@ -15,16 +15,14 @@ STATES = {
     'AK': 'Alaska',
     'AL': 'Alabama',
     'AR': 'Arkansas',
-    'AS': 'American Samoa',
     'AZ': 'Arizona',
     'CA': 'California',
     'CO': 'Colorado',
     'CT': 'Connecticut',
-    'DC': 'District of Columbia',
+    #'DC': 'District of Columbia',
     'DE': 'Delaware',
     'FL': 'Florida',
     'GA': 'Georgia',
-    'GU': 'Guam',
     'HI': 'Hawaii',
     'IA': 'Iowa',
     'ID': 'Idaho',
@@ -39,10 +37,8 @@ STATES = {
     'MI': 'Michigan',
     'MN': 'Minnesota',
     'MO': 'Missouri',
-    'MP': 'Northern Mariana Islands',
     'MS': 'Mississippi',
     'MT': 'Montana',
-    'NA': 'National',
     'NC': 'North Carolina',
     'ND': 'North Dakota',
     'NE': 'Nebraska',
@@ -55,7 +51,6 @@ STATES = {
     'OK': 'Oklahoma',
     'OR': 'Oregon',
     'PA': 'Pennsylvania',
-    'PR': 'Puerto Rico',
     'RI': 'Rhode Island',
     'SC': 'South Carolina',
     'SD': 'South Dakota',
@@ -63,7 +58,6 @@ STATES = {
     'TX': 'Texas',
     'UT': 'Utah',
     'VA': 'Virginia',
-    'VI': 'Virgin Islands',
     'VT': 'Vermont',
     'WA': 'Washington',
     'WI': 'Wisconsin',
@@ -119,7 +113,10 @@ def get_cities(state):
     return cities
 
 def get_beer(city, state):
-    """Determines maximum # of ratings and returns list of response data"""
+    """Determines maximum # of ratings and returns list of response data.
+    
+       Page will display "fail" if no entries exist for city.
+    """
     responses = []
     base_url = 'http://www.beeradvocate.com/place/list/?start={}&c_id=US&s_id={}&city={}&sort=name'
     response = requests.get(base_url.format(0, state, '+'.join(city)))
@@ -140,7 +137,7 @@ def get_beer(city, state):
 
     return responses
 
-def parse(response_data, city):
+def parse(response_data, city, state):
     """Parses names, streets, zipcodes, categories, ratings from responses"""
     for data in response_data:
         names = [name.getText() for name in
@@ -152,7 +149,7 @@ def parse(response_data, city):
         zipcodes = []
         streets = []
         for address in addresses:
-            zipcode_pattern = ''.join(['(?<=', STATES[STATE], r', )\d{5}'])
+            zipcode_pattern = ''.join(['(?<=', STATES[state], r', )\d{5}'])
             zipcode = re.search(zipcode_pattern, address)
             if zipcode:
                 zipcodes.append(zipcode.group())
@@ -183,9 +180,7 @@ def parse(response_data, city):
 def geocoder(bars):
     """Geocodes bar information using GoogleV3 API and returns geoJSON FeatureCollection"""
     geolocator = GoogleV3()
-
     for bar in bars:
-
         if bar.zipcode:
             print bar.name
             try:
@@ -203,9 +198,10 @@ def ba_to_json(cities, state):
     features = []
 
     for city in cities:
+        print '\n'.join(["*"*10, city[0], "*"*10]) 
         response = get_beer(city, state)
         if response:
-            bars = parse(response, city)
+            bars = parse(response, city, state)
             features.extend(geocoder(bars))
 
     featurecollection = FeatureCollection(features)
@@ -220,6 +216,23 @@ def ba_to_json(cities, state):
         geojson.dump(featurecollection, geofile)
 
     return output_file
+
+def ba_usa():
+    features = []
+    for state in STATES.iterkeys():
+        print '\n'.join(["*"*10, state, "*"*10]) 
+        cities = get_cities(state)
+        for city in cities:
+            print '\n'.join(["*"*10, city[0], "*"*10]) 
+            response = get_beer(city, state)
+            if response:
+                bars = parse(response, city, state)
+                features.extend(geocoder(bars))
+
+    featurecollection = FeatureCollection(features)
+    output_file = "usa.json" 
+    with open(output_file, 'a') as geofile:
+        geojson.dump(featurecollection, geofile)
 
 def ba_to_cartodb(cartodb, output_file):
     """Utilizes the CartoDB Import API to upload json file"""
@@ -244,13 +257,16 @@ if __name__ == '__main__':
     parser.add_argument(
         '--city', type=str, nargs='+', help='City')
     parser.add_argument(
-        '--state', required=True, help='Two letter state abreviation')
+        '--state', help='Two letter state abreviation')
+    parser.add_argument('--usa', action='store_true', help='Parses all of USA locations')
     parser.add_argument(
         '--cartodb', type=str, nargs=2, help='Upload resulting file to CartoDB Format: user key')
     args = parser.parse_args()
 
     STATE = args.state
-    if args.city:
+    if args.usa:
+        ba_usa()
+    elif args.city:
         CITY = [args.city]
     else:
         CITY = get_cities(STATE)
