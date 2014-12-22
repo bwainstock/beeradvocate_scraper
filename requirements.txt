@@ -1,11 +1,6 @@
 argparse==1.2.1
 beautifulsoup4==4.3.2
 geojson==1.0.9
-<<<<<<< HEAD
 geopy==1.6.1
 requests==2.5.0
 wsgiref==0.1.2
-=======
-geopy==1.5.0
-requests==2.5.0
->>>>>>> 7b5bd1194d2d000337583321e0d082271087f8fd
