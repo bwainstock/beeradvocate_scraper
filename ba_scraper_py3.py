@@ -217,21 +217,6 @@ def ba_to_json(cities, states):
     features_to_json(features, output_file)
     return output_file
 
-def ba_usa():
-    features = []
-    for state in iter(STATES.keys()):
-        print('\n'.join(["*"*10, state, "*"*10]))
-        cities = get_cities(state)
-        for city in cities:
-            print('\n'.join(["*"*10, ' '.join(city), "*"*10, state, "*"*10]))
-            response = get_beer(city, state)
-            if response:
-                bars = parse(response, city, state)
-                features.extend(geocoder(bars))
-
-    output_file = "usa.json" 
-    features_to_json(features, output_file)
-
 def ba_to_cartodb(cartodb, output_file):
     """Utilizes the CartoDB Import API to upload json file"""
     url = 'https://{}.cartodb.com/api/v1/imports/?api_key={}'.format(cartodb[0], cartodb[1])
