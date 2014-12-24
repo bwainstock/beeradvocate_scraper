@@ -6,7 +6,7 @@ from time import sleep
 
 from bs4 import BeautifulSoup
 import geopy
-from geopy.geocoders import GoogleV3
+from geopy.geocoders import GoogleV3, MapQuest
 from geojson import Point, Feature, FeatureCollection
 import geojson
 import requests
@@ -16,10 +16,10 @@ STATES = {
     'AL': 'Alabama',
     'AR': 'Arkansas',
     'AZ': 'Arizona',
-    'CA': 'California',
+    #'CA': 'California',
     'CO': 'Colorado',
     'CT': 'Connecticut',
-    #'DC': 'District of Columbia',
+    'DC': 'District of Columbia',
     'DE': 'Delaware',
     'FL': 'Florida',
     'GA': 'Georgia',
@@ -179,7 +179,8 @@ def parse(response_data, city, state):
 
 def geocoder(bars):
     """Geocodes bar information using GoogleV3 API and returns geoJSON FeatureCollection"""
-    geolocator = GoogleV3()
+    #geolocator = GoogleV3()
+    geolocator = MapQuest('Fmjtd%7Cluurn901nh%2Caw%3Do5-9wt51w', timeout=3)
     for bar in bars:
         if bar.zipcode:
             print bar.name
@@ -212,7 +213,7 @@ def ba_to_json(cities, state):
         output_file = '.'.join([city_state, 'json']).lower()
     else:
         output_file = '.'.join([state, 'json']).lower()
-    with open(output_file, 'a') as geofile:
+    with open('./output/states/'+output_file, 'a') as geofile:
         geojson.dump(featurecollection, geofile)
 
     return output_file
@@ -223,7 +224,7 @@ def ba_usa():
         print '\n'.join(["*"*10, state, "*"*10]) 
         cities = get_cities(state)
         for city in cities:
-            print '\n'.join(["*"*10, city[0], "*"*10]) 
+            print '\n'.join(["*"*10, city[0], "*"*10, state, "*"*10]) 
             response = get_beer(city, state)
             if response:
                 bars = parse(response, city, state)
