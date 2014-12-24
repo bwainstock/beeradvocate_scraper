@@ -219,7 +219,7 @@ def ba_to_json(cities, states):
 
 def ba_usa():
     features = []
-    for state in STATES.keys():
+    for state in iter(STATES.keys()):
         print('\n'.join(["*"*10, state, "*"*10]))
         cities = get_cities(state)
         for city in cities:
@@ -274,7 +274,7 @@ if __name__ == '__main__':
     
     if args.usa: #All of USA
         CITY = None
-        STATE = STATES.keys()
+        STATE = iter(STATES.keys())
     elif args.city: #Just one city
         CITY = [args.city]
         STATE = [args.state]
