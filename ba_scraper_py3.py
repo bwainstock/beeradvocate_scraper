@@ -71,9 +71,11 @@ class Bar(object):
     geocode(lon, lat): formats a geojson geometry and Feature
     """
 
-    def __init__(self, name, street, zipcode, categories, rating):
+    def __init__(self, name, street, city, state, zipcode, categories, rating):
         self.name = name
         self.street = street
+        self.city = ' '.join(city)
+        self.state = state
         self.zipcode = zipcode
         self.categories = categories
         self.rating = rating
@@ -92,25 +94,10 @@ class Bar(object):
         self.geom = Point((self.lon, self.lat))
         self.feature = Feature(geometry=self.geom,
                                properties={'name': self.name,
+                                           'city': self.city,
+                                           'state': self.state,
                                            'rating': self.rating,
                                            'categories': self.categories})
-
-def geocoder(bars):
-    """Geocodes bar information using GoogleV3 API and returns geoJSON FeatureCollection"""
-    #geolocator = GoogleV3()
-    geolocator = MapQuest('Fmjtd%7Cluurn901nh%2Caw%3Do5-9wt51w', timeout=3)
-    for bar in bars:
-        if bar.zipcode:
-            print(bar.name)
-            try:
-                location = geolocator.geocode(' '.join([bar.street, bar.zipcode]))
-            except geopy.exc.GeocoderUnavailable as error:
-                print(error)
-            else:
-                bar.geocode(location.longitude, location.latitude)
-            sleep(.2)
-
-    return [bar.feature for bar in bars if bar.zipcode]
 
 def parse(response_data, city, state):
     """Parses names, streets, zipcodes, categories, ratings from responses"""
@@ -148,9 +135,26 @@ def parse(response_data, city, state):
         ratings = [float(rating.getText()) if rating.getText() != '-' else 'null'  for rating in
                    data.findAll('td', attrs={'class': 'hr_bottom_light'})[::4]]
 
-        return [Bar(name, street, zipcode, cats, rating)
+        return [Bar(name, street, city, state, zipcode, cats, rating)
                 for name, street, zipcode, cats, rating in
                 zip(names, streets, zipcodes, categories, ratings)]
+
+def geocoder(bars):
+    """Geocodes bar information using GoogleV3 API and returns geoJSON FeatureCollection"""
+    #geolocator = GoogleV3()
+    geolocator = MapQuest('Fmjtd%7Cluurn901nh%2Caw%3Do5-9wt51w', timeout=3)
+    for bar in bars:
+        if bar.zipcode:
+            print(bar.name)
+            try:
+                location = geolocator.geocode(' '.join([bar.street, bar.zipcode]))
+            except geopy.exc.GeocoderUnavailable as error:
+                print(error)
+            else:
+                bar.geocode(location.longitude, location.latitude)
+            sleep(.2)
+
+    return [bar.feature for bar in bars if bar.zipcode]
 
 def get_cities(state):
     """Parses two columns of cities for given STATES from BeerAdvocate url"""
@@ -212,12 +216,17 @@ def ba_to_json(cities, states):
         city_state = '_'.join([city_name, state])
         output_file = '.'.join([city_state, 'json']).lower()
     else:
-        output_file = '.'.join([states, 'json']).lower()
+        try:
+            if len(states):
+                print(len(states))
+                output_file = '.'.join([states[0], 'json']).lower()
+        except TypeError:
+            output_file = 'usa.json'
 
     features_to_json(features, output_file)
     return output_file
 
-def ba_to_cartodb(cartodb, output_file):
+def json_to_cartodb(cartodb, output_file):
     """Utilizes the CartoDB Import API to upload json file"""
     url = 'https://{}.cartodb.com/api/v1/imports/?api_key={}'.format(cartodb[0], cartodb[1])
     response = requests.post(url, files={'file': open(output_file, 'rb')})
