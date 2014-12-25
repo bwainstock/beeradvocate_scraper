@@ -198,11 +198,12 @@ def get_beer(city, state):
 
 def ba_to_json(cities, states):
     """Creates directory structure and writes geojson data to file '/state/city_state.json'"""
-    print(states, cities)
+    print(states, '\n', cities)
     features = []
     
     for state in states:
-        if cities is None:
+        print('*'*50)
+        if len(cities) is not 1:
             cities = get_cities(state)
         for city in cities:
             print('\n'.join(["*"*10, ' '.join(city), "*"*10, state, "*"*10]))
@@ -266,14 +267,14 @@ if __name__ == '__main__':
 
     
     if args.usa: #All of USA
-        CITY = None
+        CITY = [] 
         #STATE = iter(STATES.keys())
         STATE = STATES.keys()
     elif args.city: #Just one city
         CITY = [args.city]
         STATE = [args.state]
     else: #All of state
-        CITY = None 
+        CITY = [] 
         STATE = [args.state]
 
     OUTPUT_FILE = ba_to_json(CITY, STATE)
