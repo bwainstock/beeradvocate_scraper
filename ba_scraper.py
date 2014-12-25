@@ -216,13 +216,11 @@ def ba_to_json(cities, states):
         city_name = '_'.join(city)
         city_state = '_'.join([city_name, state])
         output_file = '.'.join([city_state, 'json']).lower()
+    elif len(states) is 1:
+        print(len(states))
+        output_file = '.'.join([states[0], 'json']).lower()
     else:
-        try:
-            if len(states):
-                print(len(states))
-                output_file = '.'.join([states[0], 'json']).lower()
-        except TypeError:
-            output_file = 'usa.json'
+        output_file = 'usa.json'
 
     features_to_json(features, output_file)
     return output_file
@@ -269,7 +267,8 @@ if __name__ == '__main__':
     
     if args.usa: #All of USA
         CITY = None
-        STATE = iter(STATES.keys())
+        #STATE = iter(STATES.keys())
+        STATE = STATES.keys()
     elif args.city: #Just one city
         CITY = [args.city]
         STATE = [args.state]
