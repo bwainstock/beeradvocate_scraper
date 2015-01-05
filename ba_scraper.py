@@ -151,6 +151,8 @@ def geocoder(bars):
                 location = geolocator.geocode(' '.join([bar.street, bar.zipcode]))
             except geopy.exc.GeocoderUnavailable as error:
                 print(error)
+            except geopy.exc.GeocoderTimedOut as error:
+                print(error)
             else:
                 bar.geocode(location.longitude, location.latitude)
             sleep(.2)
