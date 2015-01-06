@@ -254,8 +254,7 @@ def features_to_json(features, filename):
     with open(filename, 'a') as geofile:
         geojson.dump(featurecollection, geofile)
 
-if __name__ == '__main__':
-
+def main():
     parser = argparse.ArgumentParser(
         description='Returns Beer Advocate geodata for City, State')
     parser.add_argument(
@@ -283,3 +282,6 @@ if __name__ == '__main__':
 
     if args.cartodb:
         ba_to_cartodb(args.cartodb, OUTPUT_FILE)
+
+if __name__ == '__main__':
+    main()
