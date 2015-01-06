@@ -6,3 +6,4 @@ TODO:
 =====
 Figure out output file/directory structure
 Parse all of USA/World
+Geofence data when geocode
