@@ -4,6 +4,7 @@
 import argparse
 import re
 from time import sleep
+import sqlite3
 
 from bs4 import BeautifulSoup
 import geopy
@@ -100,8 +101,161 @@ class Bar(object):
                                            'rating': self.rating,
                                            'categories': self.categories})
 
+def geocoder(bars):
+    """Geocodes bar information using GoogleV3 API and returns geoJSON FeatureCollection
+
+    Keyword arguments:
+    bars -- list of Bar objects
+    
+    Returns:
+    -- list of geoJson Feature objects
+    """
+    #geolocator = GoogleV3()
+    geolocator = MapQuest('Fmjtd%7Cluurn901nh%2Caw%3Do5-9wt51w', timeout=3)
+    for bar in bars:
+        if bar.zipcode:
+            print(bar.name)
+            try:
+                location = geolocator.geocode(' '.join([bar.street, bar.zipcode]))
+            except geopy.exc.GeocoderUnavailable as error:
+                print(error)
+            except geopy.exc.GeocoderTimedOut as error:
+                print(error)
+            else:
+                bar.geocode(location.longitude, location.latitude)
+            sleep(.2)
+
+    return [bar.feature for bar in bars if bar.zipcode]
+
+def db_cache(bars):
+    """Queries a sqlite database to for cached bar information.  If the bar exists, update if needed.
+    
+    Keyword arguments:
+    bars -- list of Bar objects
+
+    Returns:
+    new_bars -- list of Bar objects not present in database cache
+    """
+
+    conn = sqlite3.connect('test.db')
+    c = conn.cursor()
+    new_bars = []
+
+    for bar in bars:
+        columns = (bar.name, bar.city)
+        query = c.execute('''select * from ba_states where name = ? and city = ?;''', columns)
+        selection = query.fetchone()
+        if selection:
+            if bar.rating != selection[5]:
+                columns = (bar.rating, bar.name, bar.city)
+                c.execute('''update ba_states set rating = ? where name = ? and city = ?;''', columns)
+        else:
+            new_bars.append(bar)
+
+        return new_bars
+
+def ba_to_json(cities, states):
+    """Creates directory structure and writes geojson data to file '/state/city_state.json
+    
+    Keyword arguments:
+    cities -- list of city or cities if multiple
+    states -- list of state or states if all of USA
+
+    Returns:
+    output_file -- str of filename of output
+    """
+    print(states, '\n', cities)
+    features = []
+    
+    for state in states:
+        print('*'*50)
+        if len(cities) is not 1:
+            cities = get_cities(state)
+        for city in cities:
+            print('\n'.join(["*"*10, ' '.join(city), "*"*10, state, "*"*10]))
+            response = get_beer(city, state)
+            if response:
+                bars = parse(response, city, state)
+                new_bars = db_cache(bars)
+                features.extend(geocoder(new_bars))
+
+    if len(cities) is 1:
+        city = cities[0]
+        city_name = '_'.join(city)
+        city_state = '_'.join([city_name, state])
+        output_file = '.'.join([city_state, 'json']).lower()
+    elif len(states) is 1:
+        output_file = '.'.join([states[0], 'json']).lower()
+    else:
+        output_file = 'usa.json'
+
+    features_to_json(features, output_file)
+    return output_file
+
+def get_cities(state):
+    """Parses two columns of cities for given STATES from BeerAdvocate url
+
+    Keyword arguments:
+    state -- str of one state
+
+    Returns -- list of all cities belonging to state
+    """
+    url = 'http://www.beeradvocate.com/place/directory/9/US/{}/'.format(state)
+    response = requests.get(url)
+    data = BeautifulSoup(response.content)
+
+    tables = data.findAll('table',
+                          attrs={'width': '100%',
+                                 'border': '0',
+                                 'cellspacing': '0',
+                                 'cellpadding': '2'})
+    for table in tables:
+        if 'Cities & Towns' in table.findChild().text:
+            cities = [city.text.split() for city in table.findAll('li')]
+
+    return cities
+
+def get_beer(city, state):
+    """Determines maximum # of ratings and returns list of response data.
+
+    Keyword arguments:
+    city -- str of one city
+    state -- str of one state
+
+    Returns:
+    responses -- list of html data from each page of city BeerAdvocate webpage 
+    """
+    responses = []
+    base_url = 'http://www.beeradvocate.com/place/list/?start={}&c_id=US&s_id={}&city={}&sort=name'
+    response = requests.get(base_url.format(0, state, '+'.join(city)))
+    if 'fail' not in response.url: # If no entries exist for given city, url will include fail
+        data = BeautifulSoup(response.content)
+        responses.append(data)
+        num_results = data.findAll('td', attrs={'bgcolor': '#000000'})
+        num_results = num_results[0].text
+        num_results = re.findall(r'(\d+)(?!.*\d)', num_results)
+        num_results = int(num_results[0])
+
+        url_list = [base_url.format(start, state, '+'.join(city))
+                    for start in range(20, 20 * (num_results // 20) + 1, 20)]
+        for url in url_list:
+            response = requests.get(url)
+            data = BeautifulSoup(response.content)
+            responses.append(data)
+
+    return responses
+
 def parse(response_data, city, state):
-    """Parses names, streets, zipcodes, categories, ratings from responses"""
+    """Parses names, streets, zipcodes, categories, ratings from responses
+
+    Keyword arguments:
+    response_data -- list of html data from each page of city BeerAdvocate webpage 
+    city -- str of one city
+    state -- str of one state
+
+    Returns:
+    -- list of parsed city information in form of Bar objects
+    """
     for data in response_data:
         names = [name.getText() for name in
                  data.findAll('td', attrs={'colspan': 2, 'align': 'left'})]
@@ -140,96 +294,28 @@ def parse(response_data, city, state):
                 for name, street, zipcode, cats, rating in
                 zip(names, streets, zipcodes, categories, ratings)]
 
-def geocoder(bars):
-    """Geocodes bar information using GoogleV3 API and returns geoJSON FeatureCollection"""
-    #geolocator = GoogleV3()
-    geolocator = MapQuest('Fmjtd%7Cluurn901nh%2Caw%3Do5-9wt51w', timeout=3)
-    for bar in bars:
-        if bar.zipcode:
-            print(bar.name)
-            try:
-                location = geolocator.geocode(' '.join([bar.street, bar.zipcode]))
-            except geopy.exc.GeocoderUnavailable as error:
-                print(error)
-            except geopy.exc.GeocoderTimedOut as error:
-                print(error)
-            else:
-                bar.geocode(location.longitude, location.latitude)
-            sleep(.2)
+def features_to_json(features, filename):
+    """Accepts a list of Features and outputs a FeatureCollection json file
 
-    return [bar.feature for bar in bars if bar.zipcode]
-
-def get_cities(state):
-    """Parses two columns of cities for given STATES from BeerAdvocate url"""
-    url = 'http://www.beeradvocate.com/place/directory/9/US/{}/'.format(state)
-    response = requests.get(url)
-    data = BeautifulSoup(response.content)
-
-    tables = data.findAll('table',
-                          attrs={'width': '100%',
-                                 'border': '0',
-                                 'cellspacing': '0',
-                                 'cellpadding': '2'})
-    for table in tables:
-        if 'Cities & Towns' in table.findChild().text:
-            cities = [city.text.split() for city in table.findAll('li')]
-
-    return cities
-
-def get_beer(city, state):
-    """Determines maximum # of ratings and returns list of response data."""
-    responses = []
-    base_url = 'http://www.beeradvocate.com/place/list/?start={}&c_id=US&s_id={}&city={}&sort=name'
-    response = requests.get(base_url.format(0, state, '+'.join(city)))
-    if 'fail' not in response.url: # If no entries exist for given city, url will include fail
-        data = BeautifulSoup(response.content)
-        responses.append(data)
-        num_results = data.findAll('td', attrs={'bgcolor': '#000000'})
-        num_results = num_results[0].text
-        num_results = re.findall(r'(\d+)(?!.*\d)', num_results)
-        num_results = int(num_results[0])
-
-        url_list = [base_url.format(start, state, '+'.join(city))
-                    for start in range(20, 20 * (num_results // 20) + 1, 20)]
-        for url in url_list:
-            response = requests.get(url)
-            data = BeautifulSoup(response.content)
-            responses.append(data)
-
-    return responses
-
-def ba_to_json(cities, states):
-    """Creates directory structure and writes geojson data to file '/state/city_state.json'"""
-    print(states, '\n', cities)
-    features = []
+    Keyword arguments:
+    features -- list of geoJson Feature objects
+    filename -- str of filename to output to
+    """
+    featurecollection = FeatureCollection(features)
     
-    for state in states:
-        print('*'*50)
-        if len(cities) is not 1:
-            cities = get_cities(state)
-        for city in cities:
-            print('\n'.join(["*"*10, ' '.join(city), "*"*10, state, "*"*10]))
-            response = get_beer(city, state)
-            if response:
-                bars = parse(response, city, state)
-                features.extend(geocoder(bars))
+    if not filename.endswith('.json'):
+        filename = ''.join([filename, '.json'])
 
-    if len(cities) is 1:
-        city = cities[0]
-        city_name = '_'.join(city)
-        city_state = '_'.join([city_name, state])
-        output_file = '.'.join([city_state, 'json']).lower()
-    elif len(states) is 1:
-        print(len(states))
-        output_file = '.'.join([states[0], 'json']).lower()
-    else:
-        output_file = 'usa.json'
-
-    features_to_json(features, output_file)
-    return output_file
+    with open(filename, 'a') as geofile:
+        geojson.dump(featurecollection, geofile)
 
 def json_to_cartodb(cartodb, output_file):
-    """Utilizes the CartoDB Import API to upload json file"""
+    """Utilizes the CartoDB Import API to upload json file
+    
+    Keyword arguments:
+    cartodb -- list of [cartodb_username, cartodb_api_key]
+    output_file -- str of filename containing json objects
+    """
     url = 'https://{}.cartodb.com/api/v1/imports/?api_key={}'.format(cartodb[0], cartodb[1])
     response = requests.post(url, files={'file': open(output_file, 'rb')})
     if response.json()['success']:
@@ -243,16 +329,6 @@ def json_to_cartodb(cartodb, output_file):
         print('https://{}.cartodb.com/tables/{}'.format(cartodb[0], table_name))
     else:
         print('There was an error with your upload.')
-
-def features_to_json(features, filename):
-    """Accepts a list of Features and outputs a FeatureCollection json file"""
-    featurecollection = FeatureCollection(features)
-    
-    if not filename.endswith('.json'):
-        filename = ''.join([filename, '.json'])
-
-    with open(filename, 'a') as geofile:
-        geojson.dump(featurecollection, geofile)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -269,7 +345,6 @@ def main():
     
     if args.usa: #All of USA
         CITY = [] 
-        #STATE = iter(STATES.keys())
         STATE = STATES.keys()
     elif args.city: #Just one city
         CITY = [args.city]
