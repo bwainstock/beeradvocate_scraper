@@ -6,6 +6,6 @@ TODO:
 =====
 -- Figure out output file/directory structure
 -- Parse all of USA/World
--- Geofence data when geocode
+-- Geofence data when geocode (shapely polygon contains)
 -- Add new bars to db function
 -- Output to json on demand (DB by default)
