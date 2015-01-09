@@ -256,15 +256,19 @@ def parse(response_data, city, state):
     Returns:
     -- list of parsed city information in form of Bar objects
     """
+    zipcodes = []
+    streets = []
+    names = []
+    ratings = []
+    categories = []
     for data in response_data:
-        names = [name.getText() for name in
+        temp_names = [name.getText() for name in
                  data.findAll('td', attrs={'colspan': 2, 'align': 'left'})]
+        names.extend(temp_names)
 
         addresses = [address.getText() for address in
                      data.findAll('td', attrs={'class': 'hr_bottom_dark',
                                                'align': 'left'})]
-        zipcodes = []
-        streets = []
         for address in addresses:
             zipcode_pattern = ''.join(['(?<=', STATES[state], r', )\d{5}'])
             zipcode = re.search(zipcode_pattern, address)
@@ -284,15 +288,17 @@ def parse(response_data, city, state):
         raw_categories = [re.findall(cat_pattern, category.getText())[0].split() for category in
                           data.findAll('td', attrs={'class': 'hr_bottom_dark',
                                                     'align': 'right'})]
-        categories = [[cat.strip(',') for cat in cat_list]
-                      for cat_list in raw_categories]
+        temp_categories = [[cat.strip(',') for cat in cat_list]
+                            for cat_list in raw_categories]
+        categories.extend(temp_categories)
 
-        ratings = [float(rating.getText()) if rating.getText() != '-' else 'null'  for rating in
-                   data.findAll('td', attrs={'class': 'hr_bottom_light'})[::4]]
+        temp_ratings = [float(rating.getText()) if rating.getText() != '-' else 'null'  for rating in
+                        data.findAll('td', attrs={'class': 'hr_bottom_light'})[::4]]
+        ratings.extend(temp_ratings)
 
-        return [Bar(name, street, city, state, zipcode, cats, rating)
-                for name, street, zipcode, cats, rating in
-                zip(names, streets, zipcodes, categories, ratings)]
+    return [Bar(name, street, city, state, zipcode, cats, rating)
+            for name, street, zipcode, cats, rating in
+            zip(names, streets, zipcodes, categories, ratings)]
 
 def features_to_json(features, filename):
     """Accepts a list of Features and outputs a FeatureCollection json file
